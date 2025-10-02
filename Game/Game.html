@@ -1,0 +1,646 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MVP Planet</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Nunito:wght@400;700;900&display=swap');
+
+        :root {
+            --bg-color: #3d352e;
+            --world-bg: #f3eade;
+            --text-color: #f3eade;
+            --accent-color: #e8743e;
+            --player-color: #a88d6c;
+            --platform-color: #6d5d4d;
+            --platform-stitch: #d1c7bd;
+            --portal-color: #5a9b9b;
+            --portal-glow: #8eeeee;
+            --shadow-color: rgba(0, 0, 0, 0.2);
+            --water-color: rgba(90, 155, 155, 0.6);
+            --lava-color: #ff6b35;
+            --lava-glow: #ffc8b2;
+            --enemy-color: #c0392b;
+            --collectible-color: #f1c40f;
+            --collectible-glow: #f9e79f;
+        }
+
+        body {
+            font-family: 'Nunito', sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            margin: 0;
+            padding: 0;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            overflow: hidden;
+        }
+
+        .game-container {
+            text-align: center;
+            width: 100%;
+            max-width: 800px;
+            position: relative;
+        }
+
+        h1 {
+            font-weight: 900;
+            font-size: clamp(2rem, 8vw, 3.5rem);
+            margin: 0 0 1rem 0;
+            color: var(--accent-color);
+            text-shadow: 2px 2px 5px var(--shadow-color);
+        }
+
+        p {
+            font-size: clamp(0.9rem, 4vw, 1.2rem);
+            margin: 0.5rem 0 1rem 0;
+            opacity: 0.9;
+        }
+        
+        .game-btn {
+            background-color: var(--accent-color);
+            color: var(--text-color);
+            border: 2px solid var(--world-bg);
+            border-radius: 20px;
+            padding: 10px 25px;
+            font-family: 'Nunito', sans-serif;
+            font-weight: 700;
+            font-size: 1.2rem;
+            cursor: pointer;
+            margin-bottom: 1rem;
+            transition: background-color 0.2s, transform 0.2s;
+            box-shadow: 0 4px 10px var(--shadow-color);
+        }
+
+        .game-btn:hover {
+            background-color: #ff8c5a;
+            transform: translateY(-2px);
+        }
+
+        .game-btn:active {
+            transform: translateY(1px);
+        }
+        
+        #restart-btn {
+            font-size: 1rem;
+            padding: 8px 20px;
+        }
+        
+        .game-ui-bar {
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            right: 10px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            z-index: 10;
+            pointer-events: none;
+        }
+
+        #level-display, #collectible-counter {
+            background-color: rgba(0,0,0,0.2);
+            color: var(--text-color);
+            padding: 5px 15px;
+            border-radius: 20px;
+            font-weight: 700;
+        }
+
+        #game-world {
+            background-color: var(--world-bg);
+            background-image: url('data:image/svg+xml;utf8,<svg width="100" height="100" viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg"><rect width="100" height="100" fill="%23f3eade"/><path d="M 25 5 L 25 20 M 50 20 L 50 35 M 75 35 L 75 50 M 5 50 L 5 65 M 35 65 L 35 80 M 65 80 L 65 95" stroke="%23e0d5c6" stroke-width="2" stroke-linecap="round"/></svg>');
+            width: 100%;
+            height: 500px;
+            border: 8px solid var(--platform-color);
+            border-radius: 15px;
+            box-shadow: 0 10px 30px var(--shadow-color), inset 0 0 20px rgba(0,0,0,0.1);
+            position: relative;
+            overflow: hidden;
+            margin: 0 auto;
+        }
+        
+        #player {
+            width: 40px;
+            height: 50px;
+            background-color: var(--player-color);
+            position: absolute;
+            bottom: 0;
+            left: 50px;
+            border-radius: 15px 15px 10px 10px;
+            border: 2px solid #8e7457;
+            box-shadow: inset 0 -5px 10px rgba(0,0,0,0.15);
+            transition: transform 0.1s ease-out;
+            z-index: 5;
+            transform-origin: bottom;
+        }
+        
+        #player.squash {
+            transform: scaleY(0.8) scaleX(1.2);
+        }
+        
+        #player::after {
+            content: '';
+            position: absolute;
+            width: 8px;
+            height: 8px;
+            background: white;
+            border-radius: 50%;
+            border: 2px solid #554433;
+            top: 12px;
+            right: 8px;
+            transition: left 0.1s, right 0.1s;
+        }
+
+        #player.facing-left::after {
+            right: auto;
+            left: 8px;
+        }
+
+        .platform {
+            background-color: var(--platform-color);
+            position: absolute;
+            border-radius: 10px;
+            box-shadow: 0 4px 8px var(--shadow-color);
+            border-top: 3px dashed var(--platform-stitch);
+            border-bottom: 3px dashed var(--platform-stitch);
+        }
+        
+        .portal {
+            position: absolute;
+            background-color: var(--portal-color);
+            border-radius: 10px;
+            box-shadow: 0 0 15px var(--portal-glow);
+            animation: pulse 2s infinite ease-in-out;
+        }
+
+        .water {
+            position: absolute;
+            background-color: var(--water-color);
+            border-top: 2px solid var(--portal-glow);
+        }
+        
+        .lava {
+            position: absolute;
+            background-color: var(--lava-color);
+            border-top: 3px solid var(--lava-glow);
+            box-shadow: inset 0 5px 10px rgba(0,0,0,0.2), 0 0 10px var(--lava-glow);
+            animation: lava-flow 4s infinite linear;
+        }
+        
+        .enemy {
+            position: absolute;
+            width: 35px;
+            height: 35px;
+            background-color: var(--enemy-color);
+            border-radius: 50%;
+            border: 3px solid #802217;
+            box-shadow: inset 0 0 10px rgba(0,0,0,0.4);
+        }
+
+        .collectible {
+            position: absolute;
+            width: 30px;
+            height: 30px;
+            background-color: var(--collectible-color);
+            border-radius: 50%;
+            border: 3px solid #b7950b;
+            box-shadow: 0 0 10px var(--collectible-glow);
+            animation: pulse-collectible 1.5s infinite ease-in-out;
+            z-index: 4;
+        }
+
+        .collectible.collected {
+            animation: collected-anim 0.5s forwards;
+        }
+
+        .screen {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(45, 39, 34, 0.85);
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            color: white;
+            z-index: 100;
+            visibility: hidden;
+            opacity: 0;
+            transition: visibility 0s, opacity 0.5s linear;
+        }
+
+        .screen.visible {
+            visibility: visible;
+            opacity: 1;
+        }
+        
+        .screen h2 {
+            font-size: 3rem;
+            color: var(--accent-color);
+            margin: 0;
+        }
+        
+        .screen p {
+            font-size: 1.5rem;
+            margin: 1rem 0 2rem 0;
+        }
+        
+        .hidden {
+            display: none !important;
+        }
+        
+        #pause-menu p {
+             font-size: 1rem;
+             opacity: 0.7;
+        }
+
+        @keyframes pulse {
+            0% { transform: scale(1); box-shadow: 0 0 15px var(--portal-glow); }
+            50% { transform: scale(1.05); box-shadow: 0 0 25px var(--portal-glow); }
+            100% { transform: scale(1); box-shadow: 0 0 15px var(--portal-glow); }
+        }
+        
+        @keyframes pulse-collectible {
+            0% { transform: scale(1); }
+            50% { transform: scale(1.1); }
+            100% { transform: scale(1); }
+        }
+        
+        @keyframes collected-anim {
+            0% { transform: scale(1.2); opacity: 1; }
+            100% { transform: scale(2); opacity: 0; }
+        }
+
+        @keyframes lava-flow {
+            0% { background-position: 0 0; }
+            100% { background-position: -100px 0; }
+        }
+
+    </style>
+</head>
+<body>
+
+    <div class="game-container">
+        <div id="game-ui-header" class="hidden">
+             <h1>MVP Planet</h1>
+        </div>
+        <div id="game-world">
+            <div id="game-ui-bar" class="game-ui-bar hidden">
+                <div id="level-display">Level 0</div>
+                <div id="collectible-counter">Bubbles: 0 / 0</div>
+            </div>
+            <div id="player"></div>
+            
+            <div id="main-menu" class="screen visible">
+                <h1>MVP Planet</h1>
+                <p>Use Arrow Keys to Move &amp; Jump. Press 'P' to Pause.</p>
+                <button id="start-btn" class="game-btn">Start Game</button>
+            </div>
+            
+            <div id="pause-menu" class="screen">
+                <h2>Paused</h2>
+                <button id="resume-btn" class="game-btn">Resume</button>
+                <button id="restart-level-btn" class="game-btn">Restart Level</button>
+                 <p>(Press 'P' or Resume to continue)</p>
+            </div>
+            
+            <div id="congratulations-screen" class="screen">
+                <h2>Congratulations!</h2>
+                <p>You've reached the summit!</p>
+                <button id="play-again-btn" class="game-btn">Play Again</button>
+            </div>
+        </div>
+        <div id="game-ui-footer" class="hidden">
+             <button id="restart-btn" class="game-btn">Restart Level</button>
+        </div>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            // --- UI Elements ---
+            const gameUiHeader = document.getElementById('game-ui-header');
+            const gameUiFooter = document.getElementById('game-ui-footer');
+            const gameWorld = document.getElementById('game-world');
+            const player = document.getElementById('player');
+            const levelDisplay = document.getElementById('level-display');
+            const collectibleCounter = document.getElementById('collectible-counter');
+            const restartBtn = document.getElementById('restart-btn');
+            const mainMenu = document.getElementById('main-menu');
+            const startBtn = document.getElementById('start-btn');
+            const congratsScreen = document.getElementById('congratulations-screen');
+            const playAgainBtn = document.getElementById('play-again-btn');
+            const pauseMenu = document.getElementById('pause-menu');
+            const resumeBtn = document.getElementById('resume-btn');
+            const restartLevelBtn = document.getElementById('restart-level-btn');
+            const gameUiBar = document.getElementById('game-ui-bar');
+            
+            // --- Game State ---
+            const worldWidth = gameWorld.clientWidth;
+            const worldHeight = gameWorld.clientHeight;
+            
+            let currentLevelIndex = 0;
+            let gameObjects = { platforms: [], portals: [], waterZones: [], lavaZones: [], enemies: [], collectibles: [] };
+            let gameState = {
+                gameActive: false,
+                isPaused: false,
+                totalCollectiblesInLevel: 0,
+                collectedInLevel: 0,
+            };
+
+            let playerState = {
+                x: 50, y: worldHeight - 50, width: 40, height: 50,
+                velocityX: 0, velocityY: 0, isJumping: true,
+                inWater: false
+            };
+
+            const settings = {
+                gravity: 0.8, friction: 0.85, moveSpeed: 1.5, jumpStrength: -18,
+                waterGravity: 0.2, waterFriction: 0.7, waterJumpStrength: -10,
+                enemySpeed: 1
+            };
+
+            const keys = { ArrowRight: false, ArrowLeft: false, ArrowUp: false };
+            
+            // --- Audio ---
+            const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+            const sounds = {
+                jump: createSound(0.1, 440, 0.05, 'triangle'),
+                collect: createSound(0.2, 880, 0.1, 'sine'),
+                portal: createSound(0.3, 600, 0.2, 'sawtooth'),
+                death: createSound(0.2, 220, 0.3, 'square'),
+            };
+
+            function createSound(volume, frequency, duration, type) {
+                return () => {
+                    if (!audioContext) return;
+                    const oscillator = audioContext.createOscillator();
+                    const gainNode = audioContext.createGain();
+                    oscillator.connect(gainNode);
+                    gainNode.connect(audioContext.destination);
+                    
+                    gainNode.gain.value = volume;
+                    oscillator.frequency.value = frequency;
+                    oscillator.type = type;
+                    
+                    oscillator.start();
+                    setTimeout(() => oscillator.stop(), duration * 1000);
+                };
+            }
+
+            // --- LEVEL DATA ---
+            const levels = [
+                { name: "The Start", startPos: { x: 50, y: 430 }, platformData: [ { x: 0, y: worldHeight - 20, width: worldWidth, height: 20 }, { x: 250, y: 400, width: 150, height: 20 }, { x: 500, y: 320, width: 200, height: 20 }, ], collectibleData: [ { x: 300, y: 370 }, { x: 550, y: 290 } ], portalData: [ { x: worldWidth - 80, y: 250, width: 50, height: 70, targetLevel: 1 } ] },
+                { name: "The Hub", startPos: { x: 50, y: 430 }, platformData: [ { x: 0, y: worldHeight - 20, width: worldWidth, height: 20 }, { x: 300, y: 350, width: 200, height: 20 }, ], collectibleData: [{x: 375, y: 320}], portalData: [ { x: worldWidth - 80, y: worldHeight - 90, width: 50, height: 70, targetLevel: 2 } ] },
+                { name: "The Climb", startPos: { x: 50, y: 430 }, platformData: [ { x: 0, y: worldHeight - 20, width: 200, height: 20 }, { x: 300, y: 380, width: 100, height: 20 }, { x: 450, y: 300, width: 100, height: 20 }, { x: 600, y: 220, width: 100, height: 20 }, { x: 450, y: 140, width: 100, height: 20 }, ], collectibleData: [{x: 325, y: 350}, {x: 625, y: 190}], portalData: [ { x: 475, y: 70, width: 50, height: 70, targetLevel: 3 } ] },
+                { name: "The Gap", startPos: { x: 50, y: 430 }, platformData: [ { x: 0, y: worldHeight - 20, width: 300, height: 20 }, { x: 450, y: worldHeight - 20, width: 350, height: 20 }, ], collectibleData: [{x: 150, y: 450}], portalData: [ { x: worldWidth - 80, y: 410, width: 50, height: 70, targetLevel: 4 } ] },
+                { name: "Stairway", startPos: { x: 50, y: 430 }, platformData: [ { x: 0, y: worldHeight - 20, width: 150, height: 20 }, { x: 250, y: 400, width: 80, height: 20 }, { x: 400, y: 330, width: 80, height: 20 }, { x: 550, y: 260, width: 80, height: 20 }, { x: 700, y: 190, width: 100, height: 20 }, ], collectibleData: [{x: 420, y: 300}], portalData: [ { x: 725, y: 120, width: 50, height: 70, targetLevel: 5 } ] },
+                { name: "The Drop", startPos: { x: 50, y: 50 }, platformData: [ { x: 0, y: 120, width: 150, height: 20 }, { x: 300, y: 250, width: 200, height: 20 }, { x: 0, y: worldHeight - 20, width: 250, height: 20 }, { x: 550, y: worldHeight - 20, width: 250, height: 20 }, ], collectibleData: [{x: 375, y: 220}, {x: 650, y: 450}], portalData: [ { x: 100, y: 410, width: 50, height: 70, targetLevel: 6 } ] },
+                { name: "Zig-Zag", startPos: { x: 50, y: 430 }, platformData: [ { x: 0, y: worldHeight - 20, width: 100, height: 20 }, { x: 200, y: 400, width: 100, height: 20 }, { x: 0, y: 320, width: 100, height: 20 }, { x: 200, y: 240, width: 100, height: 20 }, { x: 400, y: 180, width: 400, height: 20 }, ], collectibleData: [{x: 250, y: 370}, {x: 50, y: 290}], portalData: [ { x: 725, y: 110, width: 50, height: 70, targetLevel: 7 } ] },
+                { name: "Leap of Faith", startPos: { x: 50, y: 100 }, platformData: [ { x: 0, y: 170, width: 100, height: 20 }, { x: 500, y: 170, width: 150, height: 20 }, { x: 350, y: worldHeight - 20, width: 100, height: 20 }, ], collectibleData: [{x: 375, y: 450}], portalData: [ { x: 550, y: 100, width: 50, height: 70, targetLevel: 8 } ] },
+                { name: "Pillar Valley", startPos: { x: 40, y: 430 }, platformData: [ { x: 0, y: worldHeight - 20, width: 100, height: 20 }, { x: 200, y: worldHeight - 20, width: 50, height: 100 }, { x: 350, y: worldHeight - 80, width: 50, height: 160 }, { x: 500, y: worldHeight - 20, width: 50, height: 100 }, { x: 650, y: worldHeight - 120, width: 50, height: 200 }, ], collectibleData: [{x: 365, y: 400}], portalData: [ { x: 650, y: 310, width: 50, height: 70, targetLevel: 9 } ] },
+                { name: "The Summit", startPos: { x: 50, y: 430 }, platformData: [ { x: 0, y: worldHeight - 20, width: 100, height: 20 }, { x: 200, y: 420, width: 50, height: 20 }, { x: 350, y: 350, width: 50, height: 20 }, { x: 200, y: 280, width: 50, height: 20 }, { x: 350, y: 210, width: 50, height: 20 }, { x: 500, y: 150, width: 50, height: 20 }, { x: 650, y: 90, width: 150, height: 20 }, ], collectibleData: [{x: 215, y: 250}, {x: 365, y: 180}], portalData: [ { x: 750, y: 20, width: 50, height: 70, targetLevel: 10 } ] },
+                { name: "The Moat", startPos: { x: 50, y: 430 }, platformData: [ { x: 0, y: worldHeight - 20, width: 250, height: 20 }, { x: 550, y: worldHeight - 20, width: 250, height: 20 } ], waterData: [ { x: 250, y: worldHeight - 60, width: 300, height: 60 } ], collectibleData: [{x: 400, y: 420}], portalData: [ { x: 720, y: 410, width: 50, height: 70, targetLevel: 11 } ] },
+                { name: "Danger Floor", startPos: { x: 50, y: 300 }, platformData: [ { x: 20, y: 350, width: 150, height: 20 }, { x: 250, y: 300, width: 100, height: 20 }, { x: 450, y: 350, width: 150, height: 20 }, { x: 650, y: 300, width: 100, height: 20 } ], lavaData: [ { x: 0, y: worldHeight - 20, width: worldWidth, height: 20 } ], collectibleData: [{x: 300, y: 270}], portalData: [ { x: 680, y: 230, width: 50, height: 70, targetLevel: 12 } ] },
+                { name: "First Sentry", startPos: { x: 50, y: 430 }, platformData: [ { x: 0, y: worldHeight - 20, width: worldWidth, height: 20 } ], enemyData: [ { x: 300, y: 445, startX: 200, endX: 600 } ], collectibleData: [{x: 400, y: 400}], portalData: [ { x: 720, y: 410, width: 50, height: 70, targetLevel: 13 } ] },
+                { name: "Lava Hops", startPos: { x: 50, y: 430 }, platformData: [ { x: 0, y: worldHeight - 20, width: 100, height: 20 }, { x: 200, y: 440, width: 50, height: 20 }, { x: 350, y: 410, width: 50, height: 20 }, { x: 500, y: 440, width: 50, height: 20 }, { x: 650, y: worldHeight - 20, width: 150, height: 20 } ], lavaData: [ { x: 100, y: worldHeight - 15, width: 550, height: 15 } ], collectibleData: [{x: 365, y: 380}], portalData: [ { x: 720, y: 410, width: 50, height: 70, targetLevel: 14 } ] },
+                { name: "Watery Grave", startPos: { x: 50, y: 200 }, platformData: [ { x: 0, y: 250, width: 100, height: 20 }, { x: 600, y: 250, width: 200, height: 20 } ], waterData: [ { x: 0, y: 300, width: worldWidth, height: 200 } ], enemyData: [ { x: 650, y: 215, startX: 620, endX: 750 } ], collectibleData: [{x: 400, y: 450}], portalData: [ { x: 720, y: 180, width: 50, height: 70, targetLevel: 15 } ] },
+                { name: "Sentry Gauntlet", startPos: { x: 50, y: 430 }, platformData: [ { x: 0, y: worldHeight - 20, width: worldWidth, height: 20 } ], enemyData: [ { x: 200, y: 445, startX: 150, endX: 350 }, { x: 500, y: 445, startX: 450, endX: 650 } ], collectibleData: [{x: 425, y: 400}], portalData: [ { x: 720, y: 410, width: 50, height: 70, targetLevel: 16 } ] },
+                { name: "Volcano Climb", startPos: { x: 50, y: 430 }, platformData: [ { x: 0, y: worldHeight - 20, width: 200, height: 20 }, { x: 300, y: 350, width: 200, height: 20 }, { x: 100, y: 250, width: 180, height: 20 }, { x: 350, y: 150, width: 150, height: 20 }, { x: 650, y: 100, width: 150, height: 20 } ], lavaData: [ { x: 250, y: 400, width: 20, height: 100 }, { x: 400, y: 200, width: 20, height: 150 } ], collectibleData: [{x: 150, y: 220}, {x: 400, y: 120}], portalData: [ { x: 720, y: 30, width: 50, height: 70, targetLevel: 17 } ] },
+                { name: "The Submarine", startPos: { x: 50, y: 50 }, platformData: [ { x: 0, y: 100, width: 100, height: 20 }, { x: worldWidth - 100, y: 100, width: 100, height: 20 } ], waterData: [ { x: 0, y: 120, width: worldWidth, height: 380 } ], enemyData: [ { x: 300, y: 250, startX: 200, endX: 600 } ], collectibleData: [{x: 400, y: 450}], portalData: [ { x: 700, y: 30, width: 50, height: 70, targetLevel: 18 } ] },
+                { name: "Triple Threat", startPos: { x: 50, y: 100 }, platformData: [ { x: 0, y: 150, width: 100, height: 20 }, { x: 300, y: 150, width: 200, height: 20 }, { x: 700, y: 150, width: 100, height: 20 } ], waterData: [ { x: 0, y: 400, width: 400, height: 100 } ], lavaData: [ { x: 400, y: 480, width: 400, height: 20 } ], enemyData: [ { x: 350, y: 115, startX: 320, endX: 450 } ], collectibleData: [{x: 200, y: 450}], portalData: [ { x: 720, y: 80, width: 50, height: 70, targetLevel: 19 } ] },
+                { name: "The Final Ascent", startPos: { x: 50, y: 430 }, platformData: [ { x: 0, y: worldHeight - 20, width: 100, height: 20 }, { x: 250, y: 380, width: 50, height: 20 }, { x: 100, y: 280, width: 50, height: 20 }, { x: 300, y: 180, width: 200, height: 20 }, { x: 600, y: 100, width: 200, height: 20 } ], enemyData: [ { x: 350, y: 145, startX: 320, endX: 450 }, { x: 650, y: 65, startX: 620, endX: 750 } ], lavaData: [ { x: 0, y: worldHeight - 15, width: worldWidth, height: 15, exclude: [{x: 0, width: 100}]} ], collectibleData: [{x: 115, y: 250}, {x: 400, y: 150}], portalData: [ { x: 720, y: 30, width: 50, height: 70, targetLevel: 20 } ] },
+                { name: "You Win!", startPos: { x: worldWidth/2 - 20, y: 430 }, platformData: [ { x: 0, y: worldHeight - 20, width: worldWidth, height: 20 } ], portalData: [ { x: worldWidth/2 - 25, y: 410, width: 50, height: 70, isWinPortal: true } ] }
+            ];
+            
+            // --- Game Logic ---
+            function clearWorld() {
+                Object.values(gameObjects).forEach(arr => {
+                    arr.forEach(obj => obj.element.remove());
+                    arr.length = 0;
+                });
+            }
+
+            function showWinScreen() {
+                gameState.gameActive = false;
+                congratsScreen.classList.add('visible');
+            }
+
+            function updateCollectibleCounter() {
+                collectibleCounter.textContent = `Bubbles: ${gameState.collectedInLevel} / ${gameState.totalCollectiblesInLevel}`;
+            }
+
+            function loadLevel(levelIndex) {
+                clearWorld();
+                
+                currentLevelIndex = levelIndex;
+                const levelData = levels[currentLevelIndex];
+                levelDisplay.textContent = `Level ${levelIndex}: ${levelData.name}`;
+
+                // Reset collectible count
+                gameState.collectedInLevel = 0;
+                gameState.totalCollectiblesInLevel = (levelData.collectibleData || []).length;
+                updateCollectibleCounter();
+
+                // --- Create Game Objects ---
+                const createGameObject = (data, className) => {
+                    const el = document.createElement('div');
+                    el.className = className;
+                    gameWorld.appendChild(el);
+                    el.style.left = `${data.x}px`;
+                    el.style.top = `${data.y}px`;
+                    if (data.width) el.style.width = `${data.width}px`;
+                    if (data.height) el.style.height = `${data.height}px`;
+                    return { element: el, ...data };
+                };
+                
+                (levelData.platformData || []).forEach(p => gameObjects.platforms.push(createGameObject(p, 'platform')));
+                (levelData.portalData || []).forEach(p => gameObjects.portals.push(createGameObject(p, 'portal')));
+                (levelData.waterData || []).forEach(w => gameObjects.waterZones.push(createGameObject(w, 'water')));
+                (levelData.lavaData || []).forEach(l => gameObjects.lavaZones.push(createGameObject(l, 'lava')));
+                (levelData.collectibleData || []).forEach(c => gameObjects.collectibles.push(createGameObject({ ...c, width: 30, height: 30 }, 'collectible')));
+                (levelData.enemyData || []).forEach(e => {
+                    const enemyObj = createGameObject({ ...e, width: 35, height: 35 }, 'enemy');
+                    enemyObj.direction = 1;
+                    gameObjects.enemies.push(enemyObj);
+                });
+                
+                // Reset player position
+                playerState.x = levelData.startPos.x; playerState.y = levelData.startPos.y;
+                playerState.velocityX = 0; playerState.velocityY = 0;
+            }
+            
+            function togglePause() {
+                if (!gameState.gameActive) return;
+                gameState.isPaused = !gameState.isPaused;
+                pauseMenu.classList.toggle('visible', gameState.isPaused);
+                if (!gameState.isPaused) requestAnimationFrame(gameLoop);
+            }
+            
+            function startGame() {
+                gameState.gameActive = true;
+                mainMenu.classList.remove('visible');
+                gameUiHeader.classList.remove('hidden');
+                gameUiFooter.classList.remove('hidden');
+                gameUiBar.classList.remove('hidden');
+                loadLevel(0);
+                requestAnimationFrame(gameLoop);
+            }
+
+            function gameLoop() {
+                if (!gameState.gameActive || gameState.isPaused) return;
+                
+                requestAnimationFrame(gameLoop);
+
+                // --- Updates ---
+                updateEnemies();
+                updatePlayer();
+                
+                // --- Render ---
+                player.style.left = `${playerState.x}px`;
+                player.style.top = `${playerState.y}px`;
+            }
+
+            function updateEnemies() {
+                gameObjects.enemies.forEach(e => {
+                    e.x += settings.enemySpeed * e.direction;
+                    if (e.x > e.endX || e.x < e.startX) { e.direction *= -1; }
+                    e.element.style.left = `${e.x}px`;
+                });
+            }
+
+            function updatePlayer() {
+                // --- Handle Input & Physics ---
+                const currentFriction = playerState.inWater ? settings.waterFriction : settings.friction;
+                const currentGravity = playerState.inWater ? settings.waterGravity : settings.gravity;
+                
+                if (keys.ArrowUp) {
+                    if (playerState.inWater) {
+                        playerState.velocityY = settings.waterJumpStrength;
+                    } else if (!playerState.isJumping) {
+                        playerState.velocityY = settings.jumpStrength;
+                        playerState.isJumping = true;
+                        player.classList.add('squash');
+                        sounds.jump();
+                        setTimeout(() => player.classList.remove('squash'), 150);
+                    }
+                }
+                if (keys.ArrowLeft) {
+                    playerState.velocityX -= settings.moveSpeed; player.classList.add('facing-left');
+                }
+                if (keys.ArrowRight) {
+                    playerState.velocityX += settings.moveSpeed; player.classList.remove('facing-left');
+                }
+                
+                playerState.velocityX *= currentFriction;
+                playerState.velocityY += currentGravity;
+                playerState.x += playerState.velocityX;
+                playerState.y += playerState.velocityY;
+
+                // --- Collision Detection ---
+                handleBoundaryCollisions();
+                handlePlatformCollisions();
+                handleHazardCollisions();
+                handleCollectibleCollisions();
+                handlePortalCollisions();
+            }
+
+            function handleBoundaryCollisions() {
+                if (playerState.x < 0) playerState.x = 0;
+                if (playerState.x + playerState.width > worldWidth) playerState.x = worldWidth - playerState.width;
+                if (playerState.y + playerState.height > worldHeight) {
+                    playerState.y = worldHeight - playerState.height;
+                    if (playerState.isJumping) player.classList.add('squash');
+                    playerState.isJumping = false;
+                    playerState.velocityY = 0;
+                }
+            }
+
+            function handlePlatformCollisions() {
+                let onPlatform = false;
+                for (const p of gameObjects.platforms) {
+                    if (playerState.x + playerState.width > p.x && playerState.x < p.x + p.width && playerState.y + playerState.height > p.y && playerState.y + playerState.height < p.y + p.height + playerState.velocityY) {
+                        playerState.y = p.y - playerState.height;
+                        if (playerState.isJumping) player.classList.add('squash');
+                        playerState.velocityY = 0;
+                        playerState.isJumping = false;
+                        onPlatform = true;
+                        break;
+                    }
+                }
+                if (!onPlatform && playerState.y < worldHeight - playerState.height) {
+                    playerState.isJumping = true;
+                    player.classList.remove('squash');
+                }
+                 // Check for water
+                playerState.inWater = gameObjects.waterZones.some(w => checkCollision(playerState, w));
+            }
+            
+            function handleHazardCollisions() {
+                for (const hazard of [...gameObjects.lavaZones, ...gameObjects.enemies]) {
+                    if (checkCollision(playerState, hazard)) {
+                        sounds.death();
+                        loadLevel(currentLevelIndex); 
+                        return;
+                    }
+                }
+            }
+            
+            function handleCollectibleCollisions() {
+                for (const c of gameObjects.collectibles) {
+                    if (checkCollision(playerState, c)) {
+                        sounds.collect();
+                        c.element.classList.add('collected');
+                        gameState.collectedInLevel++;
+                        updateCollectibleCounter();
+                        gameObjects.collectibles = gameObjects.collectibles.filter(item => item !== c);
+                    }
+                }
+            }
+            
+            function handlePortalCollisions() {
+                for (const p of gameObjects.portals) {
+                     if (checkCollision(playerState, p)) {
+                        sounds.portal();
+                        if (p.isWinPortal) showWinScreen();
+                        else loadLevel(p.targetLevel);
+                        return;
+                    }
+                }
+            }
+
+            const checkCollision = (a, b) => a.x < b.x + b.width && a.x + a.width > b.x && a.y < b.y + b.height && a.y + a.height > b.y;
+
+            // --- Event Listeners ---
+            document.addEventListener('keydown', (e) => { 
+                if (e.key === 'p' || e.key === 'P') togglePause();
+                if (keys[e.key] !== undefined) keys[e.key] = true; 
+            });
+            document.addEventListener('keyup', (e) => { if (keys[e.key] !== undefined) keys[e.key] = false; });
+            
+            startBtn.addEventListener('click', startGame);
+            restartBtn.addEventListener('click', () => loadLevel(currentLevelIndex));
+            restartLevelBtn.addEventListener('click', () => {
+                togglePause();
+                loadLevel(currentLevelIndex);
+            });
+            resumeBtn.addEventListener('click', togglePause);
+            
+            playAgainBtn.addEventListener('click', () => {
+                congratsScreen.classList.remove('visible');
+                gameUiHeader.classList.add('hidden');
+                gameUiFooter.classList.add('hidden');
+                gameUiBar.classList.add('hidden');
+                mainMenu.classList.add('visible');
+                clearWorld();
+            });
+        });
+    </script>
+</body>
+</html>
+
